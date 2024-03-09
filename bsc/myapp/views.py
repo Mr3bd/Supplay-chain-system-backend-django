@@ -1,8 +1,10 @@
 from django.http import JsonResponse
+from django.core.paginator import Paginator
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
-from .models import User
+from .models import User, Role
 import json
+from .methods import check_permission
 
 @csrf_exempt
 def login(request):
@@ -22,7 +24,7 @@ def login(request):
 
             user = User.objects.get(id=user_id)
             # Convert the user instance to dictionary
-            if user.delete == 0:
+            if user.deleted == 0:
                 user_dict = model_to_dict(user)
                 return JsonResponse({'user': user_dict})
             else:
@@ -35,21 +37,29 @@ def login(request):
 
 @csrf_exempt
 def addUser(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
     if request.method == 'POST':
         data = json.loads(request.body)
-        user_id = data.get('id')
-        name = data.get('name')
-        role = data.get('role')
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'addUser')
+        if has_per:
+            user_id = data.get('id')
+            name = data.get('name')
+            role = data.get('role')
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
-        if None in (user_id, name, role):
-            return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+            if None in (user_id, name, role):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
 
-        try:
-            # Create a new user instance and save it to the database
-            User.objects.create(id=user_id, name=name, role=role, deleted = 0)
-            return JsonResponse({'success': 'User added successfully'})
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+            try:
+                # Create a new user instance and save it to the database
+                User.objects.create(id = user_id, name = name, role = role, deleted = 0, logtime = logtime)
+                return JsonResponse({'success': 'User added successfully'})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -57,20 +67,42 @@ def addUser(request):
 def deleteUser(request):
     if request.method == 'POST':
         data = json.loads(request.body)
-        user_id = data.get('id')
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'addUser')
+        if has_per:
+            user_id = data.get('id')
+            if user_id is None:
+                return JsonResponse({'error': 'ID not provided'}, status=400)
 
-        if user_id is None:
-            return JsonResponse({'error': 'ID not provided'}, status=400)
+            try:
+                # Get the user by ID and update the 'deleted' field
+                user = User.objects.get(id=user_id)
+                user.deleted = 1
+                user.save()
+                return JsonResponse({'success': 'User deleted successfully'})
+            except User.DoesNotExist:
+                return JsonResponse({'error': 'User not found'}, status=404)
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def rolesLookUp(request):
+    if request.method == 'GET':
+        roles = Role.objects.all().order_by('id')
+
+        # Get page number and page size from query parameters
+        page_number = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('pageSize', 5))
+
+        paginator = Paginator(roles, page_size)
 
         try:
-            # Get the user by ID and update the 'deleted' field
-            user = User.objects.get(id=user_id)
-            user.deleted = 1
-            user.save()
-            return JsonResponse({'success': 'User deleted successfully'})
-        except User.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
+            page = paginator.page(page_number)
+            role_list = list(page.object_list.values())
+            return JsonResponse({'roles': role_list})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-
     return JsonResponse({'error': 'Method not allowed'}, status=405)
