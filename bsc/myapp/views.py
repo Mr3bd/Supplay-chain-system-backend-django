@@ -47,10 +47,12 @@ def addUser(request):
                 return JsonResponse({'error': 'Incomplete data provided'}, status=400)
 
             try:
+                role_model = Role.objects.get(id=role)
                 # Create a new user instance and save it to the database
-                User.objects.create(id = user_id, name = name, role = role, deleted = 0, logtime = logtime)
+                User.objects.create(id = user_id, name = name, role = role_model, deleted = 0, logtime = logtime)
                 return JsonResponse({'success': 'User added successfully'})
             except Exception as e:
+                print(e)
                 return JsonResponse({'error': str(e)}, status=500)
         else:
             return JsonResponse({'error': 'Unauthorized'}, status=401)
@@ -211,4 +213,31 @@ def addMaterial(request):
         else:
             return JsonResponse({'error': 'Unauthorized'}, status=401)
 
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+def changeUserRole(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        print(data)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'changeRole')
+        if has_per:
+            user_id = data.get('id')
+            role_id = data.get('role_id')
+            if user_id is None:
+                return JsonResponse({'error': 'ID not provided'}, status=400)
+            try:
+                # Get the user by ID and update the 'deleted' field
+                user = User.objects.get(id=user_id)
+                user.role = Role.objects.get(id=role_id) 
+                user.save()
+                return JsonResponse({'success': 'User role updated successfully'})
+            except User.DoesNotExist:
+                return JsonResponse({'error': 'User not found'}, status=404)
+            except Exception as e:
+                print(e)
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
