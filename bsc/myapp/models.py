@@ -33,7 +33,50 @@ class Material(models.Model):
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner')  # Foreign key relationship to User table
     logtime = models.CharField(max_length=255)
     name = models.CharField(max_length=255)  # New column
+    price = models.FloatField()
 
     class Meta:
         db_table = 'Materials'
         ordering = ['-logtime']
+
+
+class OrderStatus(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'OrderStatusLookup'
+        ordering = ['id']  # Order by id ascending
+
+class Product(models.Model):
+    trans_id = models.CharField(primary_key=True, max_length=70)
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner')  # Foreign key relationship to User table
+    logtime = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)  # New column
+    price = models.FloatField()
+    status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status')
+    batch_id = models.CharField(max_length=255)
+    quantity = models.IntegerField()
+    
+    class Meta:
+        db_table = 'Products'
+        ordering = ['-logtime']
+
+    def get_status_info(self):
+        if self.status:
+            return {
+                'status_id': self.status.id,
+                'status_name': self.status.name
+            }
+        else:
+            return None
+        
+class ProductMaterial(models.Model):
+    id = models.AutoField(primary_key=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    quantity = models.IntegerField()
+    
+    class Meta:
+        db_table = 'ProductMaterial'
+        ordering = ['-quantity']

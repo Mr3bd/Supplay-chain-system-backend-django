@@ -198,6 +198,7 @@ def addMaterial(request):
             owner_user = User.objects.get(id=log_id)
             name = data.get('name')
             quantity = data.get('quantity')
+            price = data.get('price')
             logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
             if None in (trans_id, name, quantity):
@@ -205,7 +206,7 @@ def addMaterial(request):
 
             try:
                 # Create a new user instance and save it to the database
-                Material.objects.create(trans_id = trans_id, name = name, quantity = quantity, owner = owner_user, logtime = logtime)
+                Material.objects.create(trans_id = trans_id, name = name, quantity = quantity, owner = owner_user, logtime = logtime, price = price)
                 return JsonResponse({'success': 'Material added successfully'})
             except Exception as e:
                 print(str(e))
