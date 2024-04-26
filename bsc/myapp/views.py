@@ -154,6 +154,8 @@ def getMaterials(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
+
 @csrf_exempt
 def getUsers(request):
     if request.method == 'GET':
@@ -239,6 +241,25 @@ def changeUserRole(request):
             except Exception as e:
                 print(e)
                 return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+@csrf_exempt
+def getAvailableMaterials(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getMaterials')
+   
+        if has_per:
+            materials = Material.objects.filter(quantity__gt=0).order_by('-logtime')
+
+            if materials.exists():  # Check if queryset is not empty
+                return JsonResponse({'materials': list(materials.values())})
+            else:
+                return JsonResponse({'materials': []})  # Return empty string if materials queryset is empty
         else:
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
