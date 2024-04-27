@@ -4,7 +4,7 @@ from django.urls import path, include
 from .views import (
     login, addUser, deleteUser, activateUser, rolesLookUp, 
     addMaterial, getMaterials, getUsers, changeUserRole,
-    getAvailableMaterials,
+    getAvailableMaterials, addProduct, getProducts
 )
 urlpatterns = [
         path('login', login, name='login'),
@@ -17,6 +17,8 @@ urlpatterns = [
         path('getUsers', getUsers, name='getUsers'),
         path('changeUserRole', changeUserRole, name='changeUserRole'),
         path('getAvailableMaterials', getAvailableMaterials, name='getAvailableMaterials'),
+        path('addProduct', addProduct, name='addProduct'),
+        path('getProducts', getProducts, name='getProducts'),
 
         
     # Add other URL patterns as needed

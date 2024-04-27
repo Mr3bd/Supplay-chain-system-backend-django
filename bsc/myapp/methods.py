@@ -1,6 +1,9 @@
+import random
+import string
 from .models import User
+
 supplier_modules = ['addMaterial', 'getMaterials']
-manufacture_modules = ['addProduct','getAvailableMaterials']
+manufacture_modules = ['addProduct','getAvailableMaterials', 'addProduct', 'getProducts']
 
 def check_permission(log_id, module = None, log_data = None):
     if log_id is None:
@@ -26,3 +29,10 @@ def check_permission(log_id, module = None, log_data = None):
     
 
     return False
+
+
+
+def generate_batch_id():
+    characters = string.ascii_uppercase + string.digits
+    batch_id = ''.join(random.choice(characters) for _ in range(10))
+    return batch_id

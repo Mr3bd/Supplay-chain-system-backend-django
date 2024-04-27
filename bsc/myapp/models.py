@@ -50,11 +50,11 @@ class OrderStatus(models.Model):
 
 class Product(models.Model):
     trans_id = models.CharField(primary_key=True, max_length=70)
-    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner')  # Foreign key relationship to User table
+    owner_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner_id')  # Foreign key relationship to User table
     logtime = models.CharField(max_length=255)
     name = models.CharField(max_length=255)  # New column
     price = models.FloatField()
-    status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status')
+    status_id = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status_id')
     batch_id = models.CharField(max_length=255)
     quantity = models.IntegerField()
     
@@ -63,10 +63,10 @@ class Product(models.Model):
         ordering = ['-logtime']
 
     def get_status_info(self):
-        if self.status:
+        if self.status_id:
             return {
-                'status_id': self.status.id,
-                'status_name': self.status.name
+                'status_id': self.status_id.id,
+                'status_name': self.status_id.name
             }
         else:
             return None

@@ -2,9 +2,9 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Role, Material
+from .models import User, Role, Material, Product, OrderStatus
 import json
-from .methods import check_permission
+from .methods import check_permission, generate_batch_id
 
 @csrf_exempt
 def login(request):
@@ -263,3 +263,68 @@ def getAvailableMaterials(request):
         else:
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+@csrf_exempt
+def addProduct(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        print(data)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'addProduct')
+        if has_per:
+            trans_id = data.get('trans_id')
+            owner_user = User.objects.get(id=log_id)
+            name = data.get('name')
+            quantity = data.get('quantity')
+            price = data.get('price')
+            status_id = 4
+            batch_id = generate_batch_id()
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+            if None in (trans_id, name, quantity, price):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                # Create a new user instance and save it to the database
+                status_model = OrderStatus.objects.get(id=status_id)
+                Product.objects.create(trans_id = trans_id, batch_id = batch_id, owner_id = owner_user, status_id = status_model, name = name,  quantity = quantity,  price = price, logtime = logtime)
+                return JsonResponse({'success': 'Product added successfully'})
+            except Exception as e:
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+@csrf_exempt
+def getProducts(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getProducts')
+   
+        if has_per:
+            products = Product.objects.all().order_by('-logtime')
+
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(products, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                products_list = list(page.object_list.values())
+                return JsonResponse({'products': products_list})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
