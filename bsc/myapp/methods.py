@@ -1,6 +1,6 @@
 from .models import User
 supplier_modules = ['addMaterial', 'getMaterials']
-manufacture_modules = ['addProduct']
+manufacture_modules = ['addProduct','getAvailableMaterials']
 
 def check_permission(log_id, module = None, log_data = None):
     if log_id is None:

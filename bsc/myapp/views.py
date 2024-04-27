@@ -251,7 +251,7 @@ def changeUserRole(request):
 def getAvailableMaterials(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
-        has_per = check_permission(log_id, 'getMaterials')
+        has_per = check_permission(log_id, 'getAvailableMaterials')
    
         if has_per:
             materials = Material.objects.filter(quantity__gt=0).order_by('-logtime')
