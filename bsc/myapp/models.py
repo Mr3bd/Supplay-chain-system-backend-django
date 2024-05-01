@@ -34,6 +34,7 @@ class Material(models.Model):
     logtime = models.CharField(max_length=255)
     name = models.CharField(max_length=255)  # New column
     price = models.FloatField()
+    material_id = models.CharField(max_length=255, null=True)  # Add the status field
 
     class Meta:
         db_table = 'Materials'
@@ -50,12 +51,14 @@ class OrderStatus(models.Model):
 
 class Product(models.Model):
     trans_id = models.CharField(primary_key=True, max_length=70)
-    owner_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner_id')  # Foreign key relationship to User table
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner_id')  # Foreign key relationship to User table
     logtime = models.CharField(max_length=255)
     name = models.CharField(max_length=255)  # New column
     price = models.FloatField()
-    status_id = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status_id')
+    status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status_id')
     batch_id = models.CharField(max_length=255)
+    product_id = models.CharField(max_length=255, null=True)  # Add the status field
+
     quantity = models.IntegerField()
     
     class Meta:
@@ -63,10 +66,18 @@ class Product(models.Model):
         ordering = ['-logtime']
 
     def get_status_info(self):
-        if self.status_id:
+        if self.status:
             return {
-                'status_id': self.status_id.id,
-                'status_name': self.status_id.name
+                'status_id': self.status.id,
+                'status_name': self.status.name
+            }
+        else:
+            return None
+    def get_owner_info(self):
+        if self.owner:
+            return {
+                'owner_id': self.owner.id,
+                'owner_name': self.owner.name
             }
         else:
             return None

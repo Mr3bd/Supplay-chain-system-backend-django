@@ -3,7 +3,7 @@ import string
 from .models import User
 
 supplier_modules = ['addMaterial', 'getMaterials']
-manufacture_modules = ['addProduct','getAvailableMaterials', 'addProduct', 'getProducts']
+manufacture_modules = ['addProduct','getAvailableMaterials', 'addProduct', 'getProducts', 'getUsersByFilter']
 
 def check_permission(log_id, module = None, log_data = None):
     if log_id is None:

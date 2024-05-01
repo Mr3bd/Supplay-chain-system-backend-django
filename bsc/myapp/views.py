@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Role, Material, Product, OrderStatus
+from .models import User, Role, Material, Product, OrderStatus, ProductMaterial
 import json
 from .methods import check_permission, generate_batch_id
 
@@ -197,18 +197,19 @@ def addMaterial(request):
         has_per = check_permission(log_id, 'addMaterial')
         if has_per:
             trans_id = data.get('trans_id')
+            material_id = data.get('material_id')
             owner_user = User.objects.get(id=log_id)
             name = data.get('name')
             quantity = data.get('quantity')
             price = data.get('price')
             logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
-            if None in (trans_id, name, quantity):
+            if None in (trans_id, name, quantity, material_id):
                 return JsonResponse({'error': 'Incomplete data provided'}, status=400)
 
             try:
                 # Create a new user instance and save it to the database
-                Material.objects.create(trans_id = trans_id, name = name, quantity = quantity, owner = owner_user, logtime = logtime, price = price)
+                Material.objects.create(trans_id = trans_id, name = name, material_id = material_id, quantity = quantity, owner = owner_user, logtime = logtime, price = price)
                 return JsonResponse({'success': 'Material added successfully'})
             except Exception as e:
                 print(str(e))
@@ -264,6 +265,26 @@ def getAvailableMaterials(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@csrf_exempt
+def getUsersByFilter(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        role_id = request.GET.get('role_id')
+        has_per = check_permission(log_id, 'getUsersByFilter')
+   
+        if has_per:
+            role = Role.objects.get(id=role_id)
+
+            users = User.objects.filter(role=role, deleted = 0).order_by('-logtime')
+
+            if users.exists():  # Check if queryset is not empty
+                return JsonResponse({'users': list(users.values())})
+            else:
+                return JsonResponse({'users': []})  # Return empty string if materials queryset is empty
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
 
 
 @csrf_exempt
@@ -272,28 +293,44 @@ def addProduct(request):
     current_datetime = datetime.now()
     if request.method == 'POST':
         data = json.loads(request.body)
-        print(data)
         log_id = data.get('log_id')
         has_per = check_permission(log_id, 'addProduct')
         if has_per:
             trans_id = data.get('trans_id')
+            product_id = data.get('product_id')
             owner_user = User.objects.get(id=log_id)
             name = data.get('name')
             quantity = data.get('quantity')
             price = data.get('price')
             status_id = 4
             batch_id = generate_batch_id()
+            material_ids_json = data.get('material_ids')
             logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-            if None in (trans_id, name, quantity, price):
+            
+            if None in (trans_id, name, quantity, price,  material_ids_json, product_id):
                 return JsonResponse({'error': 'Incomplete data provided'}, status=400)
 
             try:
+                print('here')
                 # Create a new user instance and save it to the database
                 status_model = OrderStatus.objects.get(id=status_id)
-                Product.objects.create(trans_id = trans_id, batch_id = batch_id, owner_id = owner_user, status_id = status_model, name = name,  quantity = quantity,  price = price, logtime = logtime)
+                product = Product.objects.create(trans_id = trans_id, batch_id = batch_id, product_id = product_id, owner = owner_user, status = status_model, name = name,  quantity = quantity,  price = price, logtime = logtime)
+                material_ids = json.loads(material_ids_json)
+
+                for material_data in material_ids:
+                    print('for loop')
+                    material_id = material_data['id']
+                    qty = material_data['quantity']
+                    material = Material.objects.get(pk=material_id)
+
+                    # Subtract quantity from material record
+                    material.quantity -= qty
+                    material.save()
+                    ProductMaterial.objects.create(product=product, material=material, quantity=qty)
+
                 return JsonResponse({'success': 'Product added successfully'})
             except Exception as e:
+                print('error e')
                 print(str(e))
                 return JsonResponse({'error': str(e)}, status=500)
         else:
@@ -320,7 +357,13 @@ def getProducts(request):
 
             try:
                 page = paginator.page(page_number)
-                products_list = list(page.object_list.values())
+                products_list = []
+                for product in page.object_list:
+                    product_data = model_to_dict(product)
+                    product_data['owner_info'] = product.get_owner_info()
+                    product_data['status_info'] = product.get_status_info()
+                    products_list.append(product_data)
+
                 return JsonResponse({'products': products_list})
             except Exception as e:
                 return JsonResponse({'error': str(e)}, status=500)
