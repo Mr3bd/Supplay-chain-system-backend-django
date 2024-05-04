@@ -2,9 +2,10 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Role, Material, Product, OrderStatus, ProductMaterial
+from .models import User, Role, Material, Product, OrderStatus, ProductMaterial, QaStatus, QaRequest, Order, ShippingRequest, ShippingStatus
 import json
-from .methods import check_permission, generate_batch_id
+from .methods import check_permission, generate_batch_id, generate_shippment_id
+from django.db.models import Q
 
 @csrf_exempt
 def login(request):
@@ -371,3 +372,569 @@ def getProducts(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
+
+@csrf_exempt
+def createQaRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        print(data)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'createQaRequest')
+        if has_per:
+            trans_id = data.get('trans_id')
+            product_id = data.get('product_id')
+            reward = data.get('reward')
+            item_count = data.get('item_count')
+
+            status_id = 1
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+            print(logtime)            
+            if None in (trans_id, product_id, reward, status_id):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                print('check')
+                # qa_user = User.objects.get(id=qa_id)
+                status_model = QaStatus.objects.get(id=status_id)
+                product = Product.objects.get(pk=product_id)
+                QaRequest.objects.create(trans_id = trans_id, product = product, status = status_model, item_count = item_count, reward = reward, logtime = logtime)
+                p_status = OrderStatus.objects.get(id=9)
+                product.status = p_status
+                product.save()
+    
+                return JsonResponse({'success': 'Request added successfully'})
+            except Exception as e:
+                print('error e')
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+@csrf_exempt
+def getQARequests(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getQARequests')
+   
+        if has_per:
+            qa_requests = QaRequest.objects.all().order_by('-logtime')
+
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(qa_requests, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                requests = []
+                for request in page.object_list:
+                    request_data = model_to_dict(request)
+                    request_data['status_info'] = request.get_status_info()
+                    request_data['product_info'] = request.get_product_info()
+                    requests.append(request_data)
+
+                return JsonResponse({'requests': requests})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def acceptQaRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'acceptQaRequest')
+        if has_per:
+            request_id = data.get('request_id')
+            product_id = data.get('product_id')
+            rstatus_id = 2
+            pstatus_id = 8
+
+            # used for logger
+            trans_id = data.get('trans_id')
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+            if None in (trans_id, request_id, product_id, logtime):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                qa_user = User.objects.get(id=log_id)
+                status_model = QaStatus.objects.get(id=rstatus_id)
+
+                qaRequest = QaRequest.objects.get(pk=request_id)
+                qaRequest.qa = qa_user
+                qaRequest.status = status_model
+                qaRequest.save()
+
+                product = Product.objects.get(pk=product_id)
+                pstatus_model = OrderStatus.objects.get(id=pstatus_id)
+                product.status = pstatus_model
+                product.save()                
+    
+                return JsonResponse({'success': 'Request accepted successfully'})
+            except Exception as e:
+                print('error e')
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+@csrf_exempt
+def completeQaRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'completeQaRequest')
+        if has_per:
+            request_id = data.get('request_id')
+            product_id = data.get('product_id')
+            rstatus_id = 3
+            pstatus_id = data.get('product_status')
+
+            # used for logger
+            trans_id = data.get('trans_id')
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+            if None in (trans_id, request_id, product_id, logtime):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                status_model = QaStatus.objects.get(id=rstatus_id)
+
+                qaRequest = QaRequest.objects.get(pk=request_id)
+                qaRequest.status = status_model
+                qaRequest.save()
+
+                product = Product.objects.get(pk=product_id)
+                pstatus_model = OrderStatus.objects.get(id=pstatus_id)
+                product.status = pstatus_model
+                product.save()                
+    
+                return JsonResponse({'success': 'Request completed successfully'})
+            except Exception as e:
+                print('error e')
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+def cancelQaRequest(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        request_id = data.get('request_id')
+        if None in (log_id, request_id):
+            return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+        
+        qaRequest = QaRequest.objects.filter(trans_id=request_id).order_by('-logtime').first()
+        if qaRequest:
+            product = Product.objects.get(pk=qaRequest.product.trans_id)
+            has_per = product.owner.id == log_id
+            if has_per:
+                try:                    
+                    newStatus = QaStatus.objects.get(id=4)
+                    qaRequest.status = newStatus
+                    qaRequest.save()
+
+                    pstatus = OrderStatus.objects.get(id=4)
+                    product.status = pstatus
+                    product.save()                
+        
+                    return JsonResponse({'success': 'Request canceled successfully'})
+                except Exception as e:
+                    print('error e')
+                    print(str(e))
+                    return JsonResponse({'error': str(e)}, status=500)
+            else:
+                return JsonResponse({'error': 'Unauthorized'}, status=401)
+        else:
+            return JsonResponse({'error': 'Item not found'}, status=500)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def getQaRequest(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        product_id = request.GET.get('product_id')
+        req_status = request.GET.get('status')
+        if None in (log_id, product_id, req_status):
+            return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+        
+        product = Product.objects.get(pk=product_id)
+        has_per = product.owner.id == log_id
+        if has_per:
+            currentStatus = QaStatus.objects.get(id=req_status)
+            qaRequest = QaRequest.objects.filter(
+                    product_id=product_id, 
+                    status=currentStatus).order_by('-logtime').first()
+            if qaRequest:
+                request_data = {
+                    'trans_id': qaRequest.trans_id,
+                    'item_count': qaRequest.item_count,
+                    'reward': qaRequest.reward,
+                }
+                return JsonResponse({'request_data': request_data})
+            else:
+                return JsonResponse({'error': 'Request not found'})
+
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+   
+   
+@csrf_exempt
+def getStoreProducts(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getStoreProducts')
+   
+        if has_per:
+            statusIn_model = OrderStatus.objects.get(id=1)
+            statusOut_model = OrderStatus.objects.get(id=2)
+            products = Product.objects.filter(
+                status__in=[statusIn_model, statusOut_model],
+                quantity__gt=0).order_by('-logtime')
+
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(products, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                products_list = []
+                for product in page.object_list:
+                    product_data = model_to_dict(product)
+                    product_data['owner_info'] = product.get_owner_info()
+                    product_data['status_info'] = product.get_status_info()
+                    products_list.append(product_data)
+
+                return JsonResponse({'products': products_list})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
+@csrf_exempt
+def addOrder(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'addOrder')
+        if has_per:
+            trans_id = data.get('trans_id')            
+            quantity = data.get('quantity')
+            product_id = data.get('product_id')
+            item_count = data.get('item_count')
+            
+            if None in (trans_id, quantity, product_id, item_count):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+            
+            try:
+                logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                owner_user = User.objects.get(id=log_id)
+                status_model = OrderStatus.objects.get(id=5)
+                product = Product.objects.get(trans_id=product_id)
+
+                if product.quantity - quantity >= 0:
+                    Order.objects.create(trans_id = trans_id, product = product, owner = owner_user, item_count = item_count, status = status_model, quantity = quantity,  quantity = quantity, logtime = logtime)
+                    product.quantity -= quantity
+                    if product.quantity == 0:
+                        product.status = OrderStatus.objects.get(id=2)
+                    product.save()  
+                    return JsonResponse({'success': 'Product added successfully'})
+                else:
+                    return JsonResponse({'Invalid quantity': str(e)}, status=500)
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@csrf_exempt
+def sendOrderForShipping(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'sendOrderForShipping')
+        if has_per:
+            order_id = data.get('order_id')
+            
+            if None in (order_id):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+            
+            try:
+                status_model = OrderStatus.objects.get(id=10)
+                order = Order.objects.get(trans_id=order_id)
+
+                if order.product.owner.id == log_id:
+                    order.status = status_model
+                    order.save()  
+                    return JsonResponse({'success': 'Successfully'})
+                else:
+                    return JsonResponse({'error': 'Unauthorized'}, status=401)
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def createShippingRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'createShippingRequest')
+        if has_per:
+            trans_id = data.get('trans_id')
+            order_id = data.get('order_id')
+            reward = data.get('reward')
+            item_count = data.get('item_count')
+
+            status_id = 1
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+            if None in (trans_id, order_id, reward, status_id):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                status_model = ShippingStatus.objects.get(id=status_id)
+                order = Product.objects.get(pk=order_id)
+                ShippingRequest.objects.create(trans_id = trans_id, order = order, status = status_model, item_count = item_count, reward = reward, logtime = logtime)
+                o_status = OrderStatus.objects.get(id=11)
+                order.status = o_status
+                order.save()
+    
+                return JsonResponse({'success': 'Request added successfully'})
+            except Exception as e:
+                print('error e')
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def getShippingRequests(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getShippingRequests')
+   
+        if has_per:
+            shipping_requests = ShippingRequest.objects.all().order_by('-logtime')
+
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(shipping_requests, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                requests = []
+                for req in page.object_list:
+                    request_data = model_to_dict(req)
+                    request_data['status_info'] = req.get_status_info()
+                    request_data['order_info'] = req.get_order_info()
+                    requests.append(request_data)
+
+                return JsonResponse({'requests': requests})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def acceptShippingRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'acceptShippingRequest')
+        if has_per:
+            request_id = data.get('request_id')
+            order_id = data.get('order_id')
+            rstatus_id = 2
+            ostatus_id = 6
+
+            # used for logger
+            trans_id = data.get('trans_id')
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+            if None in (trans_id, request_id, order_id, logtime):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                lg_user = User.objects.get(id=log_id)
+                status_model = ShippingStatus.objects.get(id=rstatus_id)
+
+                shippingRequest = QaRequest.objects.get(pk=request_id)
+                shippingRequest.lg = lg_user
+                shippingRequest.status = status_model
+                shippingRequest.save()
+
+                order = Order.objects.get(pk=order_id)
+                ostatus_model = OrderStatus.objects.get(id=ostatus_id)
+                order.status = ostatus_model
+                order.save()                
+    
+                return JsonResponse({'success': 'Request accepted successfully'})
+            except Exception as e:
+                print('error e')
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+@csrf_exempt
+def completeShippingRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        has_per = check_permission(log_id, 'completeShippingRequest')
+        if has_per:
+            request_id = data.get('request_id')
+            order_id = data.get('order_id')
+            rstatus_id = 3
+            ostatus_id = 7
+
+            # used for logger
+            trans_id = data.get('trans_id')
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+
+            if None in (trans_id, request_id, order_id):
+                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+
+            try:
+                status_model = ShippingStatus.objects.get(id=rstatus_id)
+
+                shippingRequest = ShippingRequest.objects.get(pk=request_id)
+                shippingRequest.status = status_model
+                shippingRequest.save()
+
+                order = Order.objects.get(pk=order_id)
+                ostatus_model = OrderStatus.objects.get(id=ostatus_id)
+                order.status = ostatus_model
+                order.save()                
+    
+                return JsonResponse({'success': 'Request completed successfully'})
+            except Exception as e:
+                print('error e')
+                print(str(e))
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def cancelShippingRequest(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        request_id = data.get('request_id')
+        if None in (log_id, request_id):
+            return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+        
+        shippingRequest = ShippingRequest.objects.filter(trans_id=request_id).order_by('-logtime').first()
+        if shippingRequest:
+            order = Order.objects.get(pk=shippingRequest.order.trans_id)
+            has_per = order.owner.id == log_id
+            if has_per:
+                try:                    
+                    newStatus = ShippingStatus.objects.get(id=4)
+                    shippingRequest.status = newStatus
+                    shippingRequest.save()
+
+                    ostatus = OrderStatus.objects.get(id=11)
+                    order.status = ostatus
+                    order.save()                
+        
+                    return JsonResponse({'success': 'Request canceled successfully'})
+                except Exception as e:
+                    print('error e')
+                    print(str(e))
+                    return JsonResponse({'error': str(e)}, status=500)
+            else:
+                return JsonResponse({'error': 'Unauthorized'}, status=401)
+        else:
+            return JsonResponse({'error': 'Item not found'}, status=500)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def getShippingRequest(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        order_id = request.GET.get('order_id')
+        req_status = request.GET.get('status')
+        if None in (log_id, order_id, req_status):
+            return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+        
+        order = Order.objects.get(pk=order_id)
+        has_per = order.owner.id == log_id
+        if has_per:
+            currentStatus = ShippingStatus.objects.get(id=req_status)
+            shippingRequest = shippingRequest.objects.filter(
+                    order=order, 
+                    status=currentStatus).order_by('-logtime').first()
+            if shippingRequest:
+                request_data = {
+                    'trans_id': shippingRequest.trans_id,
+                    'item_count': shippingRequest.item_count,
+                    'reward': shippingRequest.reward,
+                }
+                return JsonResponse({'request_data': request_data})
+            else:
+                return JsonResponse({'error': 'Request not found'})
+
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

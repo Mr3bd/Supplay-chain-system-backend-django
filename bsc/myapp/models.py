@@ -91,3 +91,115 @@ class ProductMaterial(models.Model):
     class Meta:
         db_table = 'ProductMaterial'
         ordering = ['-quantity']
+
+
+class QaStatus(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'QA_Status'
+        ordering = ['id']  # Order by id ascending
+
+
+class ShippingStatus(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'ShippingStatus'
+        ordering = ['id']  # Order by id ascending
+
+
+class QaRequest(models.Model):
+    trans_id = models.CharField(primary_key=True, max_length=70)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column='product_id')
+    qa = models.ForeignKey(User, on_delete=models.CASCADE, db_column='qa')
+    reward = models.FloatField()
+    status = models.ForeignKey(QaStatus, on_delete=models.SET_NULL, null=True, db_column='status')
+    logtime = models.CharField(max_length=255)
+    item_count = models.CharField(max_length=255, null=True)
+
+    class Meta:
+        db_table = 'QA_Requests'
+        ordering = ['-logtime']
+        
+    def get_status_info(self):
+        if self.status:
+            return {
+                'status_id': self.status.id,
+                'status_name': self.status.name
+            }
+        else:
+            return None
+    def get_product_info(self):
+        if self.product:
+            return {
+                'batch_id': self.product.batch_id,
+                'name': self.product.name
+            }
+        else:
+            return None
+        
+
+class Order(models.Model):
+    trans_id = models.CharField(primary_key=True, max_length=70)
+    shipping_id = models.CharField(max_length=255)
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner')
+    quantity = models.IntegerField()
+    product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, db_column='product')  
+    logtime = models.CharField(max_length=255)
+    item_count = models.CharField(max_length=255, null=True)  
+    status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status')
+
+    
+    class Meta:
+        db_table = 'Orders'
+        ordering = ['-logtime']
+
+    def get_status_info(self):
+        if self.status:
+            return {
+                'status_id': self.status.id,
+                'status_name': self.status.name
+            }
+        else:
+            return None
+        
+class ShippingRequest(models.Model):
+    trans_id = models.CharField(primary_key=True, max_length=70)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, db_column='order')
+    lg = models.ForeignKey(User, on_delete=models.CASCADE, db_column='lg')
+    reward = models.FloatField()
+    status = models.ForeignKey(ShippingStatus, on_delete=models.SET_NULL, null=True, db_column='status')
+    logtime = models.CharField(max_length=255)
+    item_count = models.CharField(max_length=255, null=True)
+    country = models.CharField(max_length=64)
+    city = models.CharField(max_length=64)
+    street = models.CharField(max_length=64)
+    zipcode = models.CharField(max_length=64)
+    building = models.CharField(max_length=64)
+
+    class Meta:
+        db_table = 'Shipping_Requests'
+        ordering = ['-logtime']
+
+    def get_status_info(self):
+        if self.status:
+            return {
+                'status_id': self.status.id,
+                'status_name': self.status.name
+            }
+        else:
+            return None
+    
+    def get_order_info(self):
+        if self.order:
+            return {
+                'order_id': self.order.trans_id,
+                'product_id': self.order.product.trans_id,
+                'product_name': self.order.product.name,
+            }
+        else:
+            return None
+        
