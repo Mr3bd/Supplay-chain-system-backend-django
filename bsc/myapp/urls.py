@@ -2,11 +2,15 @@
 
 from django.urls import path, include
 from .views import (
-    login, addUser, deleteUser, activateUser, rolesLookUp, 
+    login, addUser, deleteUser, activateUser, rolesLookUp,
     addMaterial, getMaterials, getUsers, changeUserRole,
     getAvailableMaterials, addProduct, getProducts, getUsersByFilter,
     createQaRequest, getQARequests, acceptQaRequest, completeQaRequest,
-    cancelQaRequest, getQaRequest, getStoreProducts
+    cancelQaRequest, getQaRequest, getStoreProducts, addOrder, getOrders,
+    sendOrderForShipping, createShippingRequest, getShippingRequests,
+    acceptShippingRequest, completeShippingRequest, cancelShippingRequest,
+    getShippingRequest
+
 )
 urlpatterns = [
         path('login', login, name='login'),
@@ -29,6 +33,13 @@ urlpatterns = [
         path('cancelQaRequest', cancelQaRequest, name='cancelQaRequest'),
         path('getQaRequest', getQaRequest, name='getQaRequest'),
         path('getStoreProducts', getStoreProducts, name='getStoreProducts'),
-     
-    # Add other URL patterns as needed
+        path('addOrder', addOrder, name='addOrder'),
+        path('getOrders', getOrders, name='getOrders'),
+        path('sendOrderForShipping', sendOrderForShipping, name='sendOrderForShipping'),
+        path('createShippingRequest', createShippingRequest, name='createShippingRequest'),
+        path('getShippingRequests', getShippingRequests, name='getShippingRequests'),
+        path('acceptShippingRequest', acceptShippingRequest, name='acceptShippingRequest'),
+        path('completeShippingRequest', completeShippingRequest, name='completeShippingRequest'),
+        path('cancelShippingRequest', cancelShippingRequest, name='cancelShippingRequest'),
+        path('getShippingRequest', getShippingRequest, name='getShippingRequest'),
 ]

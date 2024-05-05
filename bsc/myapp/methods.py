@@ -5,22 +5,20 @@ from .models import User
 supplier_modules = ['addMaterial', 'getMaterials']
 manufacture_modules = ['addProduct','getAvailableMaterials',
                        'addProduct', 'getProducts', 'getUsersByFilter',
-                       'createQaRequest', 'sendOrderForShipping']
+                       'createQaRequest', 'sendOrderForShipping', 'getOrders']
 qa_modules = ['getQARequests', 'acceptQaRequest', 'completeQaRequest']
-logistics_modules = ['getShippingRequests', 'acceptShippingRequest', 'completeShippingRequest']
-retailer_modules = ['getStoreProducts', 'addOrder', 'createShippingRequest']
+logistics_modules = ['getShippingRequests', 'acceptShippingRequest', 'completeShippingRequest', 'getOrders']
+retailer_modules = ['getStoreProducts', 'addOrder', 'createShippingRequest', 'getOrders']
 
 def check_permission(log_id, module = None, log_data = None):
     if log_id is None:
             print('h1')
             return False
     if log_data is None:
-        print('h2')
         user = User.objects.get(id=log_id)
     else:
           user = log_data
     if user.role.id == 1:
-        print('h3')
         return True
     elif module is None:
           print('h4')
@@ -33,8 +31,10 @@ def check_permission(log_id, module = None, log_data = None):
         return True
     elif user.role.id == 4 and module in qa_modules:
         print('h7')   
-        return True    
-    
+        return True 
+    elif user.role.id == 5 and module in logistics_modules:
+        print('h7')   
+        return True       
     elif user.role.id == 6 and module in retailer_modules:
         print('h7')   
         return True    
@@ -52,3 +52,17 @@ def generate_shippment_id():
     characters = string.ascii_uppercase + string.digits
     shippment_id = ''.join(random.choice(characters) for _ in range(10))
     return shippment_id
+
+def getPermissionByRole(role):
+    if role.id == 2:
+        return supplier_modules
+    elif role.id == 3:
+        return manufacture_modules
+    elif role.id == 4:
+        return qa_modules    
+    elif role.id == 5:
+        return logistics_modules 
+    elif role.id == 6:  
+        return retailer_modules
+    else:
+        return []

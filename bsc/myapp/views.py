@@ -4,7 +4,7 @@ from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
 from .models import User, Role, Material, Product, OrderStatus, ProductMaterial, QaStatus, QaRequest, Order, ShippingRequest, ShippingStatus
 import json
-from .methods import check_permission, generate_batch_id, generate_shippment_id
+from .methods import check_permission, generate_batch_id, generate_shippment_id, getPermissionByRole
 from django.db.models import Q
 
 @csrf_exempt
@@ -21,6 +21,7 @@ def login(request):
             if user.deleted == 0:
                 user_dict = model_to_dict(user)
                 user_dict['role_info'] = user.get_role_info()
+                user_dict['permissions'] = getPermissionByRole(user.role)
                 return JsonResponse({'user': user_dict})
             else:
                  return JsonResponse({'error': 'User Deleted'}, status=401)
@@ -474,7 +475,7 @@ def acceptQaRequest(request):
             try:
                 qa_user = User.objects.get(id=log_id)
                 status_model = QaStatus.objects.get(id=rstatus_id)
-
+                
                 qaRequest = QaRequest.objects.get(pk=request_id)
                 qaRequest.qa = qa_user
                 qaRequest.status = status_model
@@ -616,9 +617,8 @@ def getStoreProducts(request):
             statusIn_model = OrderStatus.objects.get(id=1)
             statusOut_model = OrderStatus.objects.get(id=2)
             products = Product.objects.filter(
-                status__in=[statusIn_model, statusOut_model],
-                quantity__gt=0).order_by('-logtime')
-
+                status__in=[statusIn_model, statusOut_model]).order_by('-logtime')
+            #quantity__gt=0
             # Get page number and page size from query parameters
             page_number = int(request.GET.get('page', 1))
             page_size = int(request.GET.get('pageSize', 5))
@@ -667,8 +667,14 @@ def addOrder(request):
                 status_model = OrderStatus.objects.get(id=5)
                 product = Product.objects.get(trans_id=product_id)
 
+                print(trans_id)
+                print(quantity)
+                print(product_id)
+                print(item_count)
+                print(log_id)
                 if product.quantity - quantity >= 0:
-                    Order.objects.create(trans_id = trans_id, product = product, owner = owner_user, item_count = item_count, status = status_model, quantity = quantity,  quantity = quantity, logtime = logtime)
+                    
+                    Order.objects.create(trans_id = trans_id, product = product, owner = owner_user, item_count = item_count, status = status_model, quantity = quantity, logtime = logtime)
                     product.quantity -= quantity
                     if product.quantity == 0:
                         product.status = OrderStatus.objects.get(id=2)
@@ -683,6 +689,42 @@ def addOrder(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
+@csrf_exempt
+def getOrders(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getOrders')
+   
+        if has_per:
+            orders = Order.objects.all()
+            #quantity__gt=0
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(orders, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                orders_list = []
+                for order in page.object_list:
+                    order_data = model_to_dict(order)
+                    order_data['status_info'] = order.get_status_info()
+                    order_data['product_info'] = order.get_product_info()
+                    order_data['requester_info'] = order.get_requester_info()
+                    orders_list.append(order_data)
+
+                return JsonResponse({'orders': orders_list})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+
+
 @csrf_exempt
 def sendOrderForShipping(request):
     if request.method == 'POST':
@@ -692,7 +734,7 @@ def sendOrderForShipping(request):
         if has_per:
             order_id = data.get('order_id')
             
-            if None in (order_id):
+            if order_id is None :
                 return JsonResponse({'error': 'Incomplete data provided'}, status=400)
             
             try:
@@ -734,8 +776,8 @@ def createShippingRequest(request):
 
             try:
                 status_model = ShippingStatus.objects.get(id=status_id)
-                order = Product.objects.get(pk=order_id)
-                ShippingRequest.objects.create(trans_id = trans_id, order = order, status = status_model, item_count = item_count, reward = reward, logtime = logtime)
+                order = Order.objects.get(pk=order_id)
+                ShippingRequest.objects.create(trans_id = trans_id, product_order = order, status = status_model, item_count = item_count, reward = reward, logtime = logtime)
                 o_status = OrderStatus.objects.get(id=11)
                 order.status = o_status
                 order.save()
@@ -807,14 +849,17 @@ def acceptShippingRequest(request):
             try:
                 lg_user = User.objects.get(id=log_id)
                 status_model = ShippingStatus.objects.get(id=rstatus_id)
+                shippment_id = generate_shippment_id()
 
-                shippingRequest = QaRequest.objects.get(pk=request_id)
+                shippingRequest = ShippingRequest.objects.get(pk=request_id)
                 shippingRequest.lg = lg_user
                 shippingRequest.status = status_model
+              
                 shippingRequest.save()
 
                 order = Order.objects.get(pk=order_id)
                 ostatus_model = OrderStatus.objects.get(id=ostatus_id)
+                order.shipment_id = shippment_id
                 order.status = ostatus_model
                 order.save()                
     
@@ -827,7 +872,6 @@ def acceptShippingRequest(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
-
 
 
 @csrf_exempt
@@ -885,7 +929,7 @@ def cancelShippingRequest(request):
         
         shippingRequest = ShippingRequest.objects.filter(trans_id=request_id).order_by('-logtime').first()
         if shippingRequest:
-            order = Order.objects.get(pk=shippingRequest.order.trans_id)
+            order = Order.objects.get(pk=shippingRequest.product_order.trans_id)
             has_per = order.owner.id == log_id
             if has_per:
                 try:                    
@@ -893,7 +937,7 @@ def cancelShippingRequest(request):
                     shippingRequest.status = newStatus
                     shippingRequest.save()
 
-                    ostatus = OrderStatus.objects.get(id=11)
+                    ostatus = OrderStatus.objects.get(id=10)
                     order.status = ostatus
                     order.save()                
         
@@ -909,6 +953,7 @@ def cancelShippingRequest(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@csrf_exempt
 def getShippingRequest(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -921,8 +966,8 @@ def getShippingRequest(request):
         has_per = order.owner.id == log_id
         if has_per:
             currentStatus = ShippingStatus.objects.get(id=req_status)
-            shippingRequest = shippingRequest.objects.filter(
-                    order=order, 
+            shippingRequest = ShippingRequest.objects.filter(
+                    product_order=order, 
                     status=currentStatus).order_by('-logtime').first()
             if shippingRequest:
                 request_data = {
@@ -938,3 +983,4 @@ def getShippingRequest(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+

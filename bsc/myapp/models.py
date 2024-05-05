@@ -58,7 +58,6 @@ class Product(models.Model):
     status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status_id')
     batch_id = models.CharField(max_length=255)
     product_id = models.CharField(max_length=255, null=True)  # Add the status field
-
     quantity = models.IntegerField()
     
     class Meta:
@@ -144,7 +143,7 @@ class QaRequest(models.Model):
 
 class Order(models.Model):
     trans_id = models.CharField(primary_key=True, max_length=70)
-    shipping_id = models.CharField(max_length=255)
+    shipment_id = models.CharField(max_length=255, null=True)
     owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner')
     quantity = models.IntegerField()
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True, db_column='product')  
@@ -152,7 +151,6 @@ class Order(models.Model):
     item_count = models.CharField(max_length=255, null=True)  
     status = models.ForeignKey(OrderStatus, on_delete=models.SET_NULL, null=True, db_column='status')
 
-    
     class Meta:
         db_table = 'Orders'
         ordering = ['-logtime']
@@ -166,9 +164,27 @@ class Order(models.Model):
         else:
             return None
         
+    def get_product_info(self):
+        if self.product:
+            return {
+                'product_id': self.product.trans_id,
+                'product_name': self.product.name,
+                'product_owner': self.product.owner.id
+            }
+        else:
+            return None
+    def get_requester_info(self):
+        if self.owner:
+            return {
+                'requester_id': self.owner.id,
+                'requester_name': self.owner.name
+            }
+        else:
+            return None
+        
 class ShippingRequest(models.Model):
     trans_id = models.CharField(primary_key=True, max_length=70)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, db_column='order')
+    product_order = models.ForeignKey(Order, on_delete=models.CASCADE, db_column='product_order')
     lg = models.ForeignKey(User, on_delete=models.CASCADE, db_column='lg')
     reward = models.FloatField()
     status = models.ForeignKey(ShippingStatus, on_delete=models.SET_NULL, null=True, db_column='status')
@@ -194,11 +210,12 @@ class ShippingRequest(models.Model):
             return None
     
     def get_order_info(self):
-        if self.order:
+        if self.product_order:
             return {
-                'order_id': self.order.trans_id,
-                'product_id': self.order.product.trans_id,
-                'product_name': self.order.product.name,
+                'order_id': self.product_order.trans_id,
+                'product_id': self.product_order.product.trans_id,
+                'product_name': self.product_order.product.name,
+                'shipment_id': self.product_order.shipment_id,
             }
         else:
             return None
