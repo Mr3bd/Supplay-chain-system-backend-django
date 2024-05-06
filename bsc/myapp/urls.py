@@ -9,7 +9,7 @@ from .views import (
     cancelQaRequest, getQaRequest, getStoreProducts, addOrder, getOrders,
     sendOrderForShipping, createShippingRequest, getShippingRequests,
     acceptShippingRequest, completeShippingRequest, cancelShippingRequest,
-    getShippingRequest
+    getShippingRequest, getSystemLogs
 
 )
 urlpatterns = [
@@ -42,4 +42,5 @@ urlpatterns = [
         path('completeShippingRequest', completeShippingRequest, name='completeShippingRequest'),
         path('cancelShippingRequest', cancelShippingRequest, name='cancelShippingRequest'),
         path('getShippingRequest', getShippingRequest, name='getShippingRequest'),
+        path('getSystemLogs', getSystemLogs, name='getSystemLogs'),
 ]

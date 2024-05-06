@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Role, Material, Product, OrderStatus, ProductMaterial, QaStatus, QaRequest, Order, ShippingRequest, ShippingStatus
+from .models import User, Role, Material, Product, OrderStatus, ProductMaterial, QaStatus, QaRequest, Order, ShippingRequest, ShippingStatus, SystemLog
 import json
 from .methods import check_permission, generate_batch_id, generate_shippment_id, getPermissionByRole
 from django.db.models import Q
@@ -212,6 +212,8 @@ def addMaterial(request):
             try:
                 # Create a new user instance and save it to the database
                 Material.objects.create(trans_id = trans_id, name = name, material_id = material_id, quantity = quantity, owner = owner_user, logtime = logtime, price = price)
+                log_action(trans_id=trans_id, owner=owner_user, description='Added a material', logtime=logtime )
+
                 return JsonResponse({'success': 'Material added successfully'})
             except Exception as e:
                 print(str(e))
@@ -329,6 +331,7 @@ def addProduct(request):
                     material.quantity -= qty
                     material.save()
                     ProductMaterial.objects.create(product=product, material=material, quantity=qty)
+                    log_action(trans_id=trans_id, owner=owner_user, description='Added a product', logtime=logtime )
 
                 return JsonResponse({'success': 'Product added successfully'})
             except Exception as e:
@@ -405,7 +408,8 @@ def createQaRequest(request):
                 p_status = OrderStatus.objects.get(id=9)
                 product.status = p_status
                 product.save()
-    
+                log_action(trans_id=trans_id, owner=product.owner, description='Requested a product review', logtime=logtime )
+
                 return JsonResponse({'success': 'Request added successfully'})
             except Exception as e:
                 print('error e')
@@ -485,7 +489,8 @@ def acceptQaRequest(request):
                 pstatus_model = OrderStatus.objects.get(id=pstatus_id)
                 product.status = pstatus_model
                 product.save()                
-    
+                log_action(trans_id=trans_id, owner=qa_user, description='Accepted the request to review a product', logtime=logtime )
+
                 return JsonResponse({'success': 'Request accepted successfully'})
             except Exception as e:
                 print('error e')
@@ -530,7 +535,8 @@ def completeQaRequest(request):
                 pstatus_model = OrderStatus.objects.get(id=pstatus_id)
                 product.status = pstatus_model
                 product.save()                
-    
+                log_action(trans_id=trans_id, owner=qaRequest.qa, description='Completed the product review', logtime=logtime )
+
                 return JsonResponse({'success': 'Request completed successfully'})
             except Exception as e:
                 print('error e')
@@ -543,10 +549,13 @@ def completeQaRequest(request):
 
 @csrf_exempt
 def cancelQaRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
     if request.method == 'POST':
         data = json.loads(request.body)
         log_id = data.get('log_id')
         request_id = data.get('request_id')
+        trans_id = data.get('trans_id')
         if None in (log_id, request_id):
             return JsonResponse({'error': 'Incomplete data provided'}, status=400)
         
@@ -554,6 +563,7 @@ def cancelQaRequest(request):
         if qaRequest:
             product = Product.objects.get(pk=qaRequest.product.trans_id)
             has_per = product.owner.id == log_id
+            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
             if has_per:
                 try:                    
                     newStatus = QaStatus.objects.get(id=4)
@@ -563,7 +573,8 @@ def cancelQaRequest(request):
                     pstatus = OrderStatus.objects.get(id=4)
                     product.status = pstatus
                     product.save()                
-        
+                    log_action(trans_id=trans_id, owner=product.owner, description='Canceled the request to review the product', logtime=logtime )
+
                     return JsonResponse({'success': 'Request canceled successfully'})
                 except Exception as e:
                     print('error e')
@@ -667,11 +678,7 @@ def addOrder(request):
                 status_model = OrderStatus.objects.get(id=5)
                 product = Product.objects.get(trans_id=product_id)
 
-                print(trans_id)
-                print(quantity)
-                print(product_id)
-                print(item_count)
-                print(log_id)
+   
                 if product.quantity - quantity >= 0:
                     
                     Order.objects.create(trans_id = trans_id, product = product, owner = owner_user, item_count = item_count, status = status_model, quantity = quantity, logtime = logtime)
@@ -679,6 +686,7 @@ def addOrder(request):
                     if product.quantity == 0:
                         product.status = OrderStatus.objects.get(id=2)
                     product.save()  
+                    log_action(trans_id=trans_id, owner=owner_user, description='Added an order', logtime=logtime )
                     return JsonResponse({'success': 'Product added successfully'})
                 else:
                     return JsonResponse({'Invalid quantity': str(e)}, status=500)
@@ -727,9 +735,12 @@ def getOrders(request):
 
 @csrf_exempt
 def sendOrderForShipping(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
     if request.method == 'POST':
         data = json.loads(request.body)
         log_id = data.get('log_id')
+        trans_id = data.get('trans_id')
         has_per = check_permission(log_id, 'sendOrderForShipping')
         if has_per:
             order_id = data.get('order_id')
@@ -740,10 +751,11 @@ def sendOrderForShipping(request):
             try:
                 status_model = OrderStatus.objects.get(id=10)
                 order = Order.objects.get(trans_id=order_id)
-
+                logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
                 if order.product.owner.id == log_id:
                     order.status = status_model
                     order.save()  
+                    log_action(trans_id=trans_id, owner=order.product.owner, description='Sent the product for shipping', logtime=logtime )
                     return JsonResponse({'success': 'Successfully'})
                 else:
                     return JsonResponse({'error': 'Unauthorized'}, status=401)
@@ -781,7 +793,8 @@ def createShippingRequest(request):
                 o_status = OrderStatus.objects.get(id=11)
                 order.status = o_status
                 order.save()
-    
+                log_action(trans_id=trans_id, owner=order.owner, description='Sent a request to ship the order', logtime=logtime )
+
                 return JsonResponse({'success': 'Request added successfully'})
             except Exception as e:
                 print('error e')
@@ -862,7 +875,8 @@ def acceptShippingRequest(request):
                 order.shipment_id = shippment_id
                 order.status = ostatus_model
                 order.save()                
-    
+                log_action(trans_id=trans_id, owner=lg_user, description='Accepted the request to ship an order', logtime=logtime )
+
                 return JsonResponse({'success': 'Request accepted successfully'})
             except Exception as e:
                 print('error e')
@@ -906,7 +920,8 @@ def completeShippingRequest(request):
                 ostatus_model = OrderStatus.objects.get(id=ostatus_id)
                 order.status = ostatus_model
                 order.save()                
-    
+                log_action(trans_id=trans_id, owner=shippingRequest.lg, description='Completed shipping the order', logtime=logtime )
+
                 return JsonResponse({'success': 'Request completed successfully'})
             except Exception as e:
                 print('error e')
@@ -920,10 +935,13 @@ def completeShippingRequest(request):
 
 @csrf_exempt
 def cancelShippingRequest(request):
+    from datetime import datetime
+    current_datetime = datetime.now()
     if request.method == 'POST':
         data = json.loads(request.body)
         log_id = data.get('log_id')
         request_id = data.get('request_id')
+        trans_id = data.get('trans_id')
         if None in (log_id, request_id):
             return JsonResponse({'error': 'Incomplete data provided'}, status=400)
         
@@ -933,6 +951,7 @@ def cancelShippingRequest(request):
             has_per = order.owner.id == log_id
             if has_per:
                 try:                    
+                    logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
                     newStatus = ShippingStatus.objects.get(id=4)
                     shippingRequest.status = newStatus
                     shippingRequest.save()
@@ -940,7 +959,8 @@ def cancelShippingRequest(request):
                     ostatus = OrderStatus.objects.get(id=10)
                     order.status = ostatus
                     order.save()                
-        
+                    log_action(trans_id=trans_id, owner=order.owner, description='Canceled the order shipping request', logtime=logtime )
+
                     return JsonResponse({'success': 'Request canceled successfully'})
                 except Exception as e:
                     print('error e')
@@ -984,3 +1004,38 @@ def getShippingRequest(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
+
+@csrf_exempt
+def getSystemLogs(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getSystemLogs')
+   
+        if has_per:
+            system_logs = SystemLog.objects.all().order_by('-logtime')
+
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(system_logs, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                logs = []
+                for log in page.object_list:
+                    log_data = model_to_dict(log)
+                    log_data['owner_info'] = log.get_owner_info()
+                    logs.append(log_data)
+
+                return JsonResponse({'logs': logs})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def log_action(trans_id, owner, description, logtime):
+        SystemLog.objects.create(trans_id = trans_id, owner = owner, description = description, logtime = logtime)

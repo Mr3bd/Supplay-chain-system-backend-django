@@ -220,3 +220,22 @@ class ShippingRequest(models.Model):
         else:
             return None
         
+
+class SystemLog(models.Model):
+    trans_id = models.CharField(primary_key=True, max_length=70)
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='owner')
+    logtime = models.CharField(max_length=255)
+    description = models.TextField()
+
+    class Meta:
+        db_table = 'Log'
+        ordering = ['-logtime']
+
+    def get_owner_info(self):
+        if self.owner:
+            return {
+                'owner_id': self.owner.id,
+                'owner_name': self.owner.name
+            }
+        else:
+            return None
