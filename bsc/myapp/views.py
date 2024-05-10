@@ -692,7 +692,6 @@ def addOrder(request):
 
    
                 if product.quantity - quantity >= 0:
-                    
                     Order.objects.create(trans_id = trans_id, product = product, owner = owner_user, item_count = item_count, status = status_model, quantity = quantity, logtime = logtime)
                     product.quantity -= quantity
                     if product.quantity == 0:
@@ -700,6 +699,7 @@ def addOrder(request):
                         product.status = OrderStatus.objects.get(id=2)
                     product.save()  
                     log_action(trans_id=trans_id, owner=owner_user, description='Added an order', logtime=logtime )
+                    noti_action(noti_users = [product.owner], description= 'Someone has purchased your product', logtime=logtime)
                     return JsonResponse({'success': 'Product added successfully'})
                 else:
                     return JsonResponse({'Invalid quantity': str(e)}, status=500)
