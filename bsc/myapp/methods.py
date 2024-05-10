@@ -2,13 +2,13 @@ import random
 import string
 from .models import User
 
-supplier_modules = ['addMaterial', 'getMaterials', 'getSystemLogs']
+supplier_modules = ['addMaterial', 'getMaterials', 'getSystemLogs', 'getNotifications']
 manufacture_modules = ['addProduct','getAvailableMaterials',
                        'addProduct', 'getProducts', 'getUsersByFilter',
-                       'createQaRequest', 'sendOrderForShipping', 'getOrders', 'getSystemLogs']
-qa_modules = ['getQARequests', 'acceptQaRequest', 'completeQaRequest', 'getSystemLogs']
-logistics_modules = ['getShippingRequests', 'acceptShippingRequest', 'completeShippingRequest', 'getOrders', 'getSystemLogs']
-retailer_modules = ['getStoreProducts', 'addOrder', 'createShippingRequest', 'getOrders', 'getSystemLogs']
+                       'createQaRequest', 'sendOrderForShipping', 'getOrders', 'getSystemLogs', 'getNotifications']
+qa_modules = ['getQARequests', 'acceptQaRequest', 'completeQaRequest', 'getSystemLogs', 'getNotifications']
+logistics_modules = ['getShippingRequests', 'acceptShippingRequest', 'completeShippingRequest', 'getOrders', 'getSystemLogs', 'getNotifications']
+retailer_modules = ['getStoreProducts', 'addOrder', 'createShippingRequest', 'getOrders', 'getSystemLogs', 'getNotifications']
 
 def check_permission(log_id, module = None, log_data = None):
     if log_id is None:

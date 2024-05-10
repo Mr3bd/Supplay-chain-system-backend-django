@@ -239,3 +239,14 @@ class SystemLog(models.Model):
             }
         else:
             return None
+        
+class Notification(models.Model):
+    id = models.AutoField(primary_key=True)
+    noti_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, db_column='noti_user')
+    description = models.TextField()
+    opened = models.IntegerField()
+    logtime = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'Notifications'
+        ordering = ['-logtime']

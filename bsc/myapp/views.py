@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.forms.models import model_to_dict
 from django.views.decorators.csrf import csrf_exempt
-from .models import User, Role, Material, Product, OrderStatus, ProductMaterial, QaStatus, QaRequest, Order, ShippingRequest, ShippingStatus, SystemLog
+from .models import User, Role, Material, Product, OrderStatus, ProductMaterial, QaStatus, QaRequest, Order, ShippingRequest, ShippingStatus, SystemLog, Notification
 import json
 from .methods import check_permission, generate_batch_id, generate_shippment_id, getPermissionByRole
 from django.db.models import Q
@@ -22,6 +22,9 @@ def login(request):
                 user_dict = model_to_dict(user)
                 user_dict['role_info'] = user.get_role_info()
                 user_dict['permissions'] = getPermissionByRole(user.role)
+                unopened_notification_count = Notification.objects.filter(noti_user = user, opened=0).count()
+                user_dict['unReadNoti'] = unopened_notification_count
+
                 return JsonResponse({'user': user_dict})
             else:
                  return JsonResponse({'error': 'User Deleted'}, status=401)
@@ -329,6 +332,9 @@ def addProduct(request):
 
                     # Subtract quantity from material record
                     material.quantity -= qty
+                    if material.quantity == 0:
+                        noti_action(noti_users = [material.owner], description= 'Your material is out of stock', logtime=logtime)
+
                     material.save()
                     ProductMaterial.objects.create(product=product, material=material, quantity=qty)
                     log_action(trans_id=trans_id, owner=owner_user, description='Added a product', logtime=logtime )
@@ -409,7 +415,9 @@ def createQaRequest(request):
                 product.status = p_status
                 product.save()
                 log_action(trans_id=trans_id, owner=product.owner, description='Requested a product review', logtime=logtime )
-
+                role = Role.objects.get(id=4)
+                noti_users = User.objects.filter(role=role)
+                noti_action(noti_users = noti_users, description= 'There is a new QA request', logtime=logtime)
                 return JsonResponse({'success': 'Request added successfully'})
             except Exception as e:
                 print('error e')
@@ -490,7 +498,7 @@ def acceptQaRequest(request):
                 product.status = pstatus_model
                 product.save()                
                 log_action(trans_id=trans_id, owner=qa_user, description='Accepted the request to review a product', logtime=logtime )
-
+                noti_action(noti_users = [product.owner], description= 'A QA user has accepted your request to review your product', logtime=logtime)
                 return JsonResponse({'success': 'Request accepted successfully'})
             except Exception as e:
                 print('error e')
@@ -537,6 +545,11 @@ def completeQaRequest(request):
                 product.save()                
                 log_action(trans_id=trans_id, owner=qaRequest.qa, description='Completed the product review', logtime=logtime )
 
+                if pstatus_id == 3:
+                    noti_action(noti_users = [product.owner], description= 'The QA user has completed reviewing your product and your product has been successfully tested, your product is now in-stock', logtime=logtime)
+                else:
+                    noti_action(noti_users = [product.owner], description= 'A QA user has completed a review of your product and your product has failed the test', logtime=logtime)
+
                 return JsonResponse({'success': 'Request completed successfully'})
             except Exception as e:
                 print('error e')
@@ -574,7 +587,6 @@ def cancelQaRequest(request):
                     product.status = pstatus
                     product.save()                
                     log_action(trans_id=trans_id, owner=product.owner, description='Canceled the request to review the product', logtime=logtime )
-
                     return JsonResponse({'success': 'Request canceled successfully'})
                 except Exception as e:
                     print('error e')
@@ -684,6 +696,7 @@ def addOrder(request):
                     Order.objects.create(trans_id = trans_id, product = product, owner = owner_user, item_count = item_count, status = status_model, quantity = quantity, logtime = logtime)
                     product.quantity -= quantity
                     if product.quantity == 0:
+                        noti_action(noti_users = [product.owner], description= 'Your product is out of stock', logtime=logtime)
                         product.status = OrderStatus.objects.get(id=2)
                     product.save()  
                     log_action(trans_id=trans_id, owner=owner_user, description='Added an order', logtime=logtime )
@@ -756,6 +769,8 @@ def sendOrderForShipping(request):
                     order.status = status_model
                     order.save()  
                     log_action(trans_id=trans_id, owner=order.product.owner, description='Sent the product for shipping', logtime=logtime )
+                    noti_action(noti_users = [order.product.owner], description= 'The manufacturer has completed packaging your order and is now ready to ship', logtime=logtime)
+
                     return JsonResponse({'success': 'Successfully'})
                 else:
                     return JsonResponse({'error': 'Unauthorized'}, status=401)
@@ -794,6 +809,10 @@ def createShippingRequest(request):
                 order.status = o_status
                 order.save()
                 log_action(trans_id=trans_id, owner=order.owner, description='Sent a request to ship the order', logtime=logtime )
+                role = Role.objects.get(id=5)
+                noti_users = User.objects.filter(role=role)
+                
+                noti_action(noti_users = noti_users, description= 'There is a new Shipping request', logtime=logtime)
 
                 return JsonResponse({'success': 'Request added successfully'})
             except Exception as e:
@@ -876,6 +895,7 @@ def acceptShippingRequest(request):
                 order.status = ostatus_model
                 order.save()                
                 log_action(trans_id=trans_id, owner=lg_user, description='Accepted the request to ship an order', logtime=logtime )
+                noti_action(noti_users = [order.owner], description= 'A Delivery Specialist user has accepted your request to ship your order', logtime=logtime)
 
                 return JsonResponse({'success': 'Request accepted successfully'})
             except Exception as e:
@@ -921,6 +941,7 @@ def completeShippingRequest(request):
                 order.status = ostatus_model
                 order.save()                
                 log_action(trans_id=trans_id, owner=shippingRequest.lg, description='Completed shipping the order', logtime=logtime )
+                noti_action(noti_users = [order.owner], description= 'A Delivery Specialist user has completed shipping your order', logtime=logtime)
 
                 return JsonResponse({'success': 'Request completed successfully'})
             except Exception as e:
@@ -1036,6 +1057,41 @@ def getSystemLogs(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@csrf_exempt
+def getNotifications(request):
+    if request.method == 'GET':
+        log_id = request.GET.get('log_id')
+        has_per = check_permission(log_id, 'getNotifications')
+   
+        if has_per:
+            user = User.objects.get(id=log_id)
+            notifications = Notification.objects.filter(noti_user = user).order_by('-logtime')
+
+            # Get page number and page size from query parameters
+            page_number = int(request.GET.get('page', 1))
+            page_size = int(request.GET.get('pageSize', 5))
+
+            paginator = Paginator(notifications, page_size)
+
+            try:
+                page = paginator.page(page_number)
+                notis = []
+                for noti in page.object_list:
+                    noti.opened = 1
+                    noti.save()
+                    notis.append(model_to_dict(noti))
+                unopened_notification_count = Notification.objects.filter(noti_user = user, opened=0).count()
+
+                return JsonResponse({'notifications': notis, 'unReadNoti': unopened_notification_count})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+        else:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def log_action(trans_id, owner, description, logtime):
         SystemLog.objects.create(trans_id = trans_id, owner = owner, description = description, logtime = logtime)
+
+def noti_action(noti_users, description, logtime):
+        for u in noti_users:
+            Notification.objects.create(noti_user = u, description = description, opened = 0, logtime = logtime)
