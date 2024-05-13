@@ -546,9 +546,9 @@ def completeQaRequest(request):
                 log_action(trans_id=trans_id, owner=qaRequest.qa, description='Completed the product review', logtime=logtime )
 
                 if pstatus_id == 3:
-                    noti_action(noti_users = [product.owner], description= 'The QA user has completed reviewing your product and your product has been successfully tested, your product is now in-stock', logtime=logtime)
-                else:
                     noti_action(noti_users = [product.owner], description= 'A QA user has completed a review of your product and your product has failed the test', logtime=logtime)
+                else:
+                    noti_action(noti_users = [product.owner], description= 'The QA user has completed reviewing your product and your product has been successfully tested, your product is now in-stock', logtime=logtime)
 
                 return JsonResponse({'success': 'Request completed successfully'})
             except Exception as e:
