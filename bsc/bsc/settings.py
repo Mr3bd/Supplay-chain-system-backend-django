@@ -83,14 +83,14 @@ WSGI_APPLICATION = 'bsc.wsgi.application'
 
 DATABASES = {
  "default": {
-        "ENGINE": "mssql",
-        "NAME": "BSC",
-        "USER": "sa",
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "bscproject-3230378634",
+        "USER": "sa-69f9",
         "PASSWORD": "Dev@P@ssw0rd",
-        "HOST": ".\\SQLEXPRESS",
-        "PORT": "",
-        "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", 
-        },
+        "HOST": "mysql.gb.stackcp.com",
+        "PORT": "56443",
+        # "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", 
+        # },
     },
 }
 

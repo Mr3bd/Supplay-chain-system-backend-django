@@ -795,16 +795,21 @@ def createShippingRequest(request):
             order_id = data.get('order_id')
             reward = data.get('reward')
             item_count = data.get('item_count')
+            country = data.get('country')
+            city = data.get('city')
+            street = data.get('street')
+            zipcode = data.get('zipcode')
+            building = data.get('building')
 
             status_id = 1
             logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-            if None in (trans_id, order_id, reward, status_id):
+            if None in (trans_id, order_id, reward, status_id, country, city, street, zipcode, building):
                 return JsonResponse({'error': 'Incomplete data provided'}, status=400)
 
             try:
                 status_model = ShippingStatus.objects.get(id=status_id)
                 order = Order.objects.get(pk=order_id)
-                ShippingRequest.objects.create(trans_id = trans_id, product_order = order, status = status_model, item_count = item_count, reward = reward, logtime = logtime)
+                ShippingRequest.objects.create(trans_id = trans_id, product_order = order, status = status_model, item_count = item_count, reward = reward, country= country, city= city, street= street, zipcode= zipcode, building= building, logtime = logtime)
                 o_status = OrderStatus.objects.get(id=11)
                 order.status = o_status
                 order.save()
