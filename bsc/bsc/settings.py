@@ -89,7 +89,7 @@ DATABASES = {
         "USER": "sa-69f9",
         "PASSWORD": "Dev@P@ssw0rd",
         "HOST": "mysql.gb.stackcp.com",
-        "PORT": "56443",
+        "PORT": "62853",
         # "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server", 
         # },
     },
