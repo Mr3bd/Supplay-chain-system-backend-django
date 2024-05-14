@@ -6,26 +6,70 @@ from .models import User, Role, Material, Product, OrderStatus, ProductMaterial,
 import json
 from .methods import check_permission, generate_batch_id, generate_shippment_id, getPermissionByRole
 from django.db.models import Q
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.contrib.auth.models import User as UAuth
+from rest_framework.decorators import api_view, permission_classes
 
 @csrf_exempt
 def login(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         user_id = data.get('id')
-        print(user_id)
         if user_id is None:
             return JsonResponse({'error': 'ID not provided'}, status=400)
 
         try:
             user = User.objects.get(id=user_id)
+            auth_token = None
+            user_auth = UAuth.objects.filter(username=user_id).first()
+
+            if user_auth:
+                # If the user already exists, authenticate the user
+                user_auth = authenticate(username=user_id, password=user_id)
+                
+                if user_auth is not None:
+                    # If user is authenticated, generate or retrieve token
+                    auth_token, created = Token.objects.get_or_create(user=user_auth)
+                    if auth_token is not None:
+                        print("Token generated successfully:", auth_token.key)
+                    else:
+                        print("Failed to generate token")
+                else:
+                   
+                    user_auth = UAuth.objects.filter(username=user_id).first()
+                    auth_token, created = Token.objects.get_or_create(user=user_auth)
+                    print("Authentication failed for user:", user_id)
+                    # Handle authentication failure
+                    # This could happen if the password is incorrect or other authentication-related issues
+                    # You may want to return an appropriate error response here
+            else:
+                # If the user does not exist, create a new user
+                user_auth = UAuth.objects.create_user(username=user_id, password=user_id)
+                if user:
+                    # If user is created successfully, generate or retrieve token
+                    auth_token, created = Token.objects.get_or_create(user=user)
+                    if auth_token is not None:
+                        print("Token generated successfully:", auth_token.key)
+                    else:
+                        print("Failed to generate token")
+                else:
+                    print("Failed to create user with username:", user_id)
+                    # Handle user creation failure
+                    # You may want to return an appropriate error response here
+
+                         
+            print(auth_token)
+        
             if user.deleted == 0:
                 user_dict = model_to_dict(user)
                 user_dict['role_info'] = user.get_role_info()
                 user_dict['permissions'] = getPermissionByRole(user.role)
                 unopened_notification_count = Notification.objects.filter(noti_user = user, opened=0).count()
                 user_dict['unReadNoti'] = unopened_notification_count
-
-                return JsonResponse({'user': user_dict})
+                user_dict['token'] = str(auth_token)
+                return JsonResponse({'user': user_dict })
             else:
                  return JsonResponse({'error': 'User Deleted'}, status=401)
         except User.DoesNotExist:
@@ -33,8 +77,8 @@ def login(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def addUser(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -64,7 +108,8 @@ def addUser(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def deleteUser(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -90,7 +135,8 @@ def deleteUser(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def activateUser(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -134,7 +180,8 @@ def rolesLookUp(request):
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getMaterials(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -161,7 +208,8 @@ def getMaterials(request):
 
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getUsers(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -191,7 +239,8 @@ def getUsers(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def addMaterial(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -226,7 +275,8 @@ def addMaterial(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def changeUserRole(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -255,7 +305,8 @@ def changeUserRole(request):
 
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getAvailableMaterials(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -272,7 +323,8 @@ def getAvailableMaterials(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getUsersByFilter(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -294,7 +346,8 @@ def getUsersByFilter(request):
 
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def addProduct(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -351,7 +404,8 @@ def addProduct(request):
 
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getProducts(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -384,7 +438,8 @@ def getProducts(request):
 
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def createQaRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -431,7 +486,8 @@ def createQaRequest(request):
 
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getQARequests(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -463,7 +519,8 @@ def getQARequests(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def acceptQaRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -511,7 +568,8 @@ def acceptQaRequest(request):
 
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def completeQaRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -560,7 +618,8 @@ def completeQaRequest(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def cancelQaRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -630,7 +689,8 @@ def getQaRequest(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
    
    
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getStoreProducts(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -667,7 +727,8 @@ def getStoreProducts(request):
 
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def addOrder(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -711,7 +772,8 @@ def addOrder(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getOrders(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -746,7 +808,8 @@ def getOrders(request):
 
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def sendOrderForShipping(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -782,7 +845,8 @@ def sendOrderForShipping(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def createShippingRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -830,7 +894,8 @@ def createShippingRequest(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getShippingRequests(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -862,7 +927,8 @@ def getShippingRequests(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def acceptShippingRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -913,7 +979,8 @@ def acceptShippingRequest(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def completeShippingRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -959,7 +1026,8 @@ def completeShippingRequest(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def cancelShippingRequest(request):
     from datetime import datetime
     current_datetime = datetime.now()
@@ -999,7 +1067,8 @@ def cancelShippingRequest(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getShippingRequest(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -1032,7 +1101,8 @@ def getShippingRequest(request):
 
 
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getSystemLogs(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
@@ -1062,12 +1132,13 @@ def getSystemLogs(request):
             return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@csrf_exempt
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getNotifications(request):
     if request.method == 'GET':
         log_id = request.GET.get('log_id')
         has_per = check_permission(log_id, 'getNotifications')
-   
+
         if has_per:
             user = User.objects.get(id=log_id)
             notifications = Notification.objects.filter(noti_user = user).order_by('-logtime')
