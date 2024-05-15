@@ -11,9 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-import pymysql
-pymysql.version_info = (1, 4, 6, 'final', 0)
-pymysql.install_as_MySQLdb()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,7 +25,7 @@ SECRET_KEY = 'django-insecure-m#zl3_)zo%6$lxc*xeu2x1x=j59!^&ioz5wscqb-e6d*65i6h#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['64.23.161.36']
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -86,18 +84,18 @@ WSGI_APPLICATION = 'bsc.wsgi.application'
 
 DATABASES = {
  "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "bscproject-3230378634",
-        "USER": "sa-69f9",
+        "ENGINE": "mssql",
+        "NAME": "BSC",
+        "USER": "sa",
         "PASSWORD": "Dev@P@ssw0rd",
-        "HOST": "mysql.gb.stackcp.com",
-        "PORT": "62853",
+        "HOST": ".\\SQLEXPRESS",
+        "PORT": "",
         "OPTIONS": {
-            "charset": "utf8mb4",
+            "driver": "ODBC Driver 17 for SQL Server", 
+        "extra_params": "TrustServerCertificate=yes;"
         },
     },
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
