@@ -24,20 +24,23 @@ def login(request):
             user = User.objects.get(id=user_id)
             auth_token = None
             user_auth = UAuth.objects.filter(username=user_id).first()
-
+            print('1')
             if user_auth:
                 # If the user already exists, authenticate the user
                 user_auth = authenticate(username=user_id, password=user_id)
+                print('2')
                 
                 if user_auth is not None:
                     # If user is authenticated, generate or retrieve token
                     auth_token, created = Token.objects.get_or_create(user=user_auth)
+                    print('3')
+
                     if auth_token is not None:
                         print("Token generated successfully:", auth_token.key)
                     else:
                         print("Failed to generate token")
                 else:
-                   
+                    print('4')
                     user_auth = UAuth.objects.filter(username=user_id).first()
                     auth_token, created = Token.objects.get_or_create(user=user_auth)
                     print("Authentication failed for user:", user_id)
@@ -45,6 +48,8 @@ def login(request):
                     # This could happen if the password is incorrect or other authentication-related issues
                     # You may want to return an appropriate error response here
             else:
+                print('5')
+
                 # If the user does not exist, create a new user
                 user_auth = UAuth.objects.create_user(username=user_id, password=user_id)
                 if user:
@@ -99,6 +104,8 @@ def addUser(request):
                 role_model = Role.objects.get(id=role)
                 # Create a new user instance and save it to the database
                 User.objects.create(id = user_id, name = name, role = role_model, deleted = 0, logtime = logtime)
+                UAuth.objects.create_user(username=user_id, password=user_id)
+
                 return JsonResponse({'success': 'User added successfully'})
             except Exception as e:
                 print(e)
