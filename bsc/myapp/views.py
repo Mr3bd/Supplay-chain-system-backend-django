@@ -82,36 +82,33 @@ def login(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
+
+@csrf_exempt
 def addUser(request):
     from datetime import datetime
     current_datetime = datetime.now()
     if request.method == 'POST':
         data = json.loads(request.body)
-        log_id = data.get('log_id')
-        has_per = check_permission(log_id, 'addUser')
-        if has_per:
-            user_id = data.get('id')
-            name = data.get('name')
-            role = data.get('role')
-            logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        print(data)
+        user_id = data.get('id')
+        name = data.get('name')
+        role = data.get('role')
+        logtime = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
-            if None in (user_id, name, role):
-                return JsonResponse({'error': 'Incomplete data provided'}, status=400)
+        if None in (user_id, name, role):
+            return JsonResponse({'error': 'Incomplete data provided'}, status=400)
 
-            try:
-                role_model = Role.objects.get(id=role)
-                # Create a new user instance and save it to the database
-                User.objects.create(id = user_id, name = name, role = role_model, deleted = 0, logtime = logtime)
-                UAuth.objects.create_user(username=user_id, password=user_id)
+        try:
+            role_model = Role.objects.get(id=role)
+            # Create a new user instance and save it to the database
+            User.objects.create(id = user_id, name = name, role = role_model, deleted = 0, logtime = logtime)
+            # UAuth.objects.create_user(username=user_id, password=user_id)
 
-                return JsonResponse({'success': 'User added successfully'})
-            except Exception as e:
-                print(e)
-                return JsonResponse({'error': str(e)}, status=500)
-        else:
-            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            return JsonResponse({'success': 'User added successfully'})
+        except Exception as e:
+            print(e)
+            return JsonResponse({'error': str(e)}, status=500)
+
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -215,34 +212,26 @@ def getMaterials(request):
 
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def getUsers(request):
     if request.method == 'GET':
-        log_id = request.GET.get('log_id')
-        has_per = check_permission(log_id,)
-   
-        if has_per:
-            users = User.objects.all().order_by('role')
+        users = User.objects.all().order_by('role')
+        # Get page number and page size from query parameters
+        page_number = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('pageSize', 5))
 
-            # Get page number and page size from query parameters
-            page_number = int(request.GET.get('page', 1))
-            page_size = int(request.GET.get('pageSize', 5))
+        paginator = Paginator(users, page_size)
 
-            paginator = Paginator(users, page_size)
+        try:
+            page = paginator.page(page_number)
+            users_list = []
+            for user in page.object_list:
+                user_data = model_to_dict(user)
+                user_data['role_info'] = user.get_role_info()  # Include role info
+                users_list.append(user_data)
+            return JsonResponse({'users': users_list})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
 
-            try:
-                page = paginator.page(page_number)
-                users_list = []
-                for user in page.object_list:
-                    user_data = model_to_dict(user)
-                    user_data['role_info'] = user.get_role_info()  # Include role info
-                    users_list.append(user_data)
-                return JsonResponse({'users': users_list})
-            except Exception as e:
-                return JsonResponse({'error': str(e)}, status=500)
-        else:
-            return JsonResponse({'error': 'Unauthorized'}, status=401)
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
