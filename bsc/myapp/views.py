@@ -102,7 +102,7 @@ def addUser(request):
             role_model = Role.objects.get(id=role)
             # Create a new user instance and save it to the database
             User.objects.create(id = user_id, name = name, role = role_model, deleted = 0, logtime = logtime)
-            # UAuth.objects.create_user(username=user_id, password=user_id)
+            UAuth.objects.create_user(username=user_id, password=user_id)
 
             return JsonResponse({'success': 'User added successfully'})
         except Exception as e:
